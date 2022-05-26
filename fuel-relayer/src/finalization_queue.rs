@@ -7,11 +7,11 @@ use ethers_core::types::{Log, H160};
 use ethers_providers::Middleware;
 use fuel_core_interfaces::{
     model::{BlockHeight, DaBlockHeight, SealedFuelBlock},
-    relayer::{RelayerDb, StakingDiff},
+    relayer::{RelayerDb, StakingDiff, ValidatorDiff},
 };
 use fuel_tx::{Address, Bytes32};
 use std::{
-    collections::{HashMap, VecDeque},
+    collections::{hash_map::Entry, HashMap, VecDeque},
     sync::Arc,
 };
 use tracing::{debug, error, info, warn};
@@ -83,8 +83,9 @@ impl FinalizationQueue {
     pub async fn get_validators(
         &mut self,
         da_height: DaBlockHeight,
+        db: &mut dyn RelayerDb,
     ) -> Option<HashMap<Address, (u64, Option<Address>)>> {
-        self.validators.get(da_height).await
+        self.validators.get(da_height, db).await
     }
 
     pub fn clear(&mut self) {
@@ -250,6 +251,7 @@ impl FinalizationQueue {
             );
             return;
         }
+        let mut validators: HashMap<Address, Option<Address>> = HashMap::new();
         while let Some(diff) = self.pending.front_mut() {
             if diff.da_height > finalized_da_height {
                 break;
@@ -257,10 +259,29 @@ impl FinalizationQueue {
             info!("flush eth log:{:?} diff:{:?}", diff.da_height, diff);
             //TODO to be paranoid, recheck events got from eth client.
 
+            let validator_diff: HashMap<Address, ValidatorDiff> = diff
+                .validators
+                .iter()
+                .map(|(val, &new)| {
+                    let old = match validators.entry(*val) {
+                        Entry::Occupied(mut entry) => {
+                            let old = *entry.get();
+                            entry.insert(new);
+                            old
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(new);
+                            self.validators.set.get(&val).map(|(_, i)| *i).flatten()
+                        }
+                    };
+                    (*val, ValidatorDiff { old, new })
+                })
+                .collect();
+
             // apply staking diffs
             db.insert_staking_diff(
                 diff.da_height,
-                &StakingDiff::new(diff.validators.clone(), diff.delegations.clone()),
+                &StakingDiff::new(validator_diff, diff.delegations.clone()),
             )
             .await;
 
