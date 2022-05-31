@@ -271,7 +271,7 @@ impl FinalizationQueue {
                         }
                         Entry::Vacant(entry) => {
                             entry.insert(new);
-                            self.validators.set.get(&val).map(|(_, i)| *i).flatten()
+                            self.validators.set.get(val).and_then(|(_, i)| *i)
                         }
                     };
                     (*val, ValidatorDiff { old, new })
@@ -566,7 +566,7 @@ mod tests {
         let s1 = rng.gen::<u16>() as u64;
         let s2 = rng.gen::<u16>() as u64;
         let s3 = rng.gen::<u16>() as u64;
-        println!("S1:{},S2:{},S3:{}",s1,s2,s3);
+        println!("S1:{},S2:{},S3:{}", s1, s2, s3);
         queue
             .append_eth_logs(vec![
                 eth_log_validator_registration(1, v1, cons1),

@@ -14,12 +14,11 @@ pub struct StakingDiff {
     pub delegations: HashMap<Address, Option<HashMap<Address, ValidatorStake>>>,
 }
 
-
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone)]
 pub struct ValidatorDiff {
     pub old: Option<Address>,
-    pub new: Option<Address>
+    pub new: Option<Address>,
 }
 
 impl StakingDiff {

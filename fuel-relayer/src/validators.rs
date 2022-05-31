@@ -61,7 +61,7 @@ impl Validators {
         let mut validators = self.set.clone();
         // get staking diffs to revert from our current set.
         let diffs = db
-            .get_staking_diffs(da_height+1, Some(self.da_height))
+            .get_staking_diffs(da_height + 1, Some(self.da_height))
             .await;
 
         for (diff_height, diff) in diffs.into_iter().rev() {
@@ -107,7 +107,7 @@ impl Validators {
 
         validators.retain(|_, (stake, consensus_key)| *stake != 0 && consensus_key.is_some());
 
-        return Some(validators);
+        Some(validators)
     }
 
     /// new_block_diff is finality slider adjusted
