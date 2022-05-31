@@ -519,15 +519,14 @@ mod tests {
         let s2 = rng.gen::<u16>() as u64;
         let s3 = rng.gen::<u16>() as u64;
 
-        let del1 = eth_log_delegation(1, delegator1, vec![v1, v2], vec![s1, s2]);
-        let del1_ret = eth_log_delegation(1, delegator1, vec![v1], vec![s1]);
-        let del2 = eth_log_delegation(1, delegator2, vec![v2], vec![s1]);
-
-        let del2_first = eth_log_delegation(2, delegator2, vec![v1], vec![s3]);
-        let del2_ret = eth_log_withdrawal(2, delegator2, 0); // amount does nothing
-
         queue
-            .append_eth_logs(vec![del1, del1_ret, del2, del2_first, del2_ret])
+            .append_eth_logs(vec![
+                eth_log_delegation(1, delegator1, vec![v1, v2], vec![s1, s2]),
+                eth_log_delegation(1, delegator1, vec![v1], vec![s1]),
+                eth_log_delegation(1, delegator2, vec![v2], vec![s1]),
+                eth_log_delegation(2, delegator2, vec![v1], vec![s3]),
+                eth_log_withdrawal(2, delegator2, 0), // amount does nothing
+            ])
             .await;
         let mut db = DummyDb::filled();
 
@@ -538,5 +537,83 @@ mod tests {
         queue.commit_diffs(&mut db, 2).await;
         assert_eq!(db.data.lock().validators.get(&v1), Some(&(s1, None)),);
         assert_eq!(db.data.lock().validators.get(&v2), Some(&(0, None)),);
+    }
+
+    #[tokio::test]
+    pub async fn simple_get_validator_set_down_drift() {
+        let mut rng = StdRng::seed_from_u64(3020);
+        let mut delegator1: Address = rng.gen();
+        let mut delegator2: Address = rng.gen();
+        let mut delegator3: Address = rng.gen();
+        delegator1.iter_mut().take(12).for_each(|i| *i = 0);
+        delegator2.iter_mut().take(12).for_each(|i| *i = 0);
+        delegator3.iter_mut().take(12).for_each(|i| *i = 0);
+        let mut v1: Address = rng.gen();
+        let mut v2: Address = rng.gen();
+        let cons1: Address = rng.gen();
+        let cons2: Address = rng.gen();
+        v1.iter_mut().take(12).for_each(|i| *i = 0);
+        v2.iter_mut().take(12).for_each(|i| *i = 0);
+
+        let mut queue = FinalizationQueue::new(
+            0,
+            H160::zero(),
+            &(hex::decode("79afbf7147841fca72b45a1978dd7669470ba67abbe5c220062924380c9c364b")
+                .unwrap()),
+            BlockHeight::from(0u64),
+        );
+
+        let s1 = rng.gen::<u16>() as u64;
+        let s2 = rng.gen::<u16>() as u64;
+        let s3 = rng.gen::<u16>() as u64;
+        println!("S1:{},S2:{},S3:{}",s1,s2,s3);
+        queue
+            .append_eth_logs(vec![
+                eth_log_validator_registration(1, v1, cons1),
+                eth_log_validator_registration(1, v2, cons2),
+                eth_log_delegation(1, delegator1, vec![v1, v2], vec![s1, s2]),
+                eth_log_delegation(2, delegator1, vec![v1], vec![s1]),
+                eth_log_delegation(2, delegator2, vec![v2], vec![s1]),
+                eth_log_delegation(3, delegator2, vec![v1], vec![s3]),
+                eth_log_withdrawal(4, delegator2, 0),
+            ])
+            .await;
+        let mut db = DummyDb::filled();
+
+        // finalize all logs
+        queue.commit_diffs(&mut db, 5).await;
+
+        let set = queue.get_validators(6, &mut db).await;
+        assert_eq!(set, None);
+
+        let set = queue.get_validators(5, &mut db).await;
+        assert!(set.is_some(), "Should be some for 5");
+        let set = set.unwrap();
+        assert_eq!(set.get(&v1), Some(&(s1, Some(cons1))));
+        assert_eq!(set.get(&v2), None);
+
+        let set = queue.get_validators(4, &mut db).await;
+        assert!(set.is_some(), "Should be some for 4");
+        let set = set.unwrap();
+        assert_eq!(set.get(&v1), Some(&(s1, Some(cons1))));
+        assert_eq!(set.get(&v2), None);
+
+        let set = queue.get_validators(3, &mut db).await;
+        assert!(set.is_some(), "Should be some for 3");
+        let set = set.unwrap();
+        assert_eq!(set.get(&v1), Some(&(s1 + s3, Some(cons1))));
+        assert_eq!(set.get(&v2), None);
+
+        let set = queue.get_validators(2, &mut db).await;
+        assert!(set.is_some(), "Should be some for 2");
+        let set = set.unwrap();
+        assert_eq!(set.get(&v1), Some(&(s1, Some(cons1))));
+        assert_eq!(set.get(&v2), Some(&(s1, Some(cons2))));
+
+        let set = queue.get_validators(1, &mut db).await;
+        assert!(set.is_some(), "Should be some for 1");
+        let set = set.unwrap();
+        assert_eq!(set.get(&v1), Some(&(s1, Some(cons1))));
+        assert_eq!(set.get(&v2), Some(&(s2, Some(cons2))));
     }
 }

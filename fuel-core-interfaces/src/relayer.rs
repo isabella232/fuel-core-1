@@ -61,30 +61,6 @@ pub trait RelayerDb:
     }
 
     /// Query delegate index to find list of blocks that delegation changed
-    /// iterate over list of indexed to find height that is greater but closest to da_height
-    /// Query thandat block StakeDiff to find actual delegation change.
-    async fn get_first_greater_delegation(&mut self,delegate: &Address, da_height: DaBlockHeight) ->  Option<HashMap<Address,u64>> {
-        // get delegate index
-        let delegate_index = Storage::<Address,Vec<DaBlockHeight>>::get(self,delegate).expect("Expect to get data without problem")?;
-        let mut last_da_height = u32::MAX;
-        for index in delegate_index.iter().rev() {
-            if  *index <= da_height {
-                break;
-            }
-            last_da_height = *index;
-        }
-        // means that first delegate is in future or not existing in current delegate_index
-        if last_da_height == u32::MAX {
-            return None
-        }
-        // get staking diff
-        let staking_diff = Storage::<DaBlockHeight,StakingDiff>::get(self, &last_da_height).expect("Expect to get data without problem")?;
-
-        staking_diff.delegations.get(delegate).unwrap().clone()
-    }
-
-
-    /// Query delegate index to find list of blocks that delegation changed
     /// iterate over list of indexed to find height that is less but closest to da_height
     /// Query that block StakeDiff to find actual delegation change.
     async fn get_first_lesser_delegation(&mut self,delegate: &Address, da_height: DaBlockHeight) ->  Option<HashMap<Address,u64>> {
