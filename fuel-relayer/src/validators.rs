@@ -106,7 +106,6 @@ impl Validators {
         }
 
         validators.retain(|_, (stake, consensus_key)| *stake != 0 && consensus_key.is_some());
-
         Some(validators)
     }
 

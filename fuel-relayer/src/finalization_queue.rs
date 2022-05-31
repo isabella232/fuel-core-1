@@ -384,12 +384,12 @@ mod tests {
             BlockHeight::from(0u64),
         );
 
-        let v1_register = eth_log_validator_registration(0, v1, c1);
-        let v2_register = eth_log_validator_registration(0, v2, c2);
-        let v1_unregister = eth_log_validator_unregistration(1, v1);
-
         queue
-            .append_eth_logs(vec![v1_register, v2_register, v1_unregister])
+            .append_eth_logs(vec![
+                eth_log_validator_registration(0, v1, c1),
+                eth_log_validator_registration(0, v2, c2),
+                eth_log_validator_unregistration(1, v1),
+            ])
             .await;
 
         let diff1 = queue.pending[0].clone();
@@ -419,13 +419,13 @@ mod tests {
             BlockHeight::from(0u64),
         );
 
-        let v1_register = eth_log_validator_registration(1, v1, c1);
-        let v2_register = eth_log_validator_registration(2, v2, c2);
-        let deposit1 = eth_log_asset_deposit(2, acc1, token1, 1, 40, nonce1, 0);
-        let v1_unregister = eth_log_validator_unregistration(3, v1);
-
         queue
-            .append_eth_logs(vec![v1_register, v2_register, deposit1, v1_unregister])
+            .append_eth_logs(vec![
+                eth_log_validator_registration(1, v1, c1),
+                eth_log_validator_registration(2, v2, c2),
+                eth_log_asset_deposit(2, acc1, token1, 1, 40, nonce1, 0),
+                eth_log_validator_unregistration(3, v1),
+            ])
             .await;
 
         let mut db = DummyDb::filled();
@@ -471,13 +471,13 @@ mod tests {
         let s2 = rng.gen::<u16>() as u64;
         let s3 = rng.gen::<u16>() as u64;
 
-        let del1 = eth_log_delegation(1, delegator1, vec![v1, v2], vec![s1, s2]);
-        let v1_register = eth_log_validator_registration(2, v1, c1);
-        let del2 = eth_log_delegation(2, delegator2, vec![v1], vec![s3]);
-        let del_with = eth_log_withdrawal(3, delegator1, 7);
-
         queue
-            .append_eth_logs(vec![del1, del2, v1_register, del_with])
+            .append_eth_logs(vec![
+                eth_log_delegation(1, delegator1, vec![v1, v2], vec![s1, s2]),
+                eth_log_validator_registration(2, v1, c1),
+                eth_log_delegation(2, delegator2, vec![v1], vec![s3]),
+                eth_log_withdrawal(3, delegator1, 7),
+            ])
             .await;
         let mut db = DummyDb::filled();
 
@@ -566,7 +566,7 @@ mod tests {
         let s1 = rng.gen::<u16>() as u64;
         let s2 = rng.gen::<u16>() as u64;
         let s3 = rng.gen::<u16>() as u64;
-        println!("S1:{},S2:{},S3:{}", s1, s2, s3);
+
         queue
             .append_eth_logs(vec![
                 eth_log_validator_registration(1, v1, cons1),
